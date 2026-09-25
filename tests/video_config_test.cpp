@@ -76,7 +76,12 @@ static void test_apply_basic() {
     CHECK(uc.antialiasing == UC::Antialiasing::MSAA4X);
     CHECK(uc.threePointFiltering == true);               // smoothTextures false -> threePoint true
     CHECK(uc.refreshRate == UC::RefreshRate::Original);
+#if defined(_WIN32)
     CHECK(uc.graphicsAPI == UC::GraphicsAPI::D3D12);
+#else
+    // validate() rejects D3D12 off Windows and stores Automatic.
+    CHECK(uc.graphicsAPI == UC::GraphicsAPI::Automatic);
+#endif
 }
 
 static void test_apply_resolution_number() {

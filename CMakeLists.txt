@@ -25,6 +25,10 @@ endif()
 # Enable via -DROGUESQ_NO_ITER_DEBUG=ON. Both defines are required to
 # avoid linker incompatibility with already-compiled debug libs.
 option(ROGUESQ_NO_ITER_DEBUG "Disable MSVC debug iterators (skip bounds checks)" OFF)
+# OFF builds the recompiler, N64ModernRuntime, RT64, host objects, and the
+# unit tests. It does not run regen_funcs and does not link the game, both of
+# which need a local ROM and the rogue_squadron64 decomp ELF.
+option(ROGUESQ_BUILD_GAME "Link RogueSquadron64Recomp (needs RecompiledFuncs)" ON)
 if(WIN32 AND ROGUESQ_NO_ITER_DEBUG)
     add_compile_definitions(_HAS_ITERATOR_DEBUGGING=0 _ITERATOR_DEBUG_LEVEL=0)
     message(STATUS "MSVC debug iterators DISABLED (vector bounds checks off)")
@@ -65,6 +69,18 @@ add_subdirectory(${CMAKE_SOURCE_DIR}/lib/N64ModernRuntime ${CMAKE_BINARY_DIR}/N6
 # N64Recomp output. Gitignored (derivative of the copyrighted ROM; generated
 # locally, never committed). Regenerate with the `regen_funcs` target.
 set(RECOMP_FUNCS_DIR "${CMAKE_SOURCE_DIR}/RecompiledFuncs")
+
+# Toolchain locations. Override on the cmake command line if installed elsewhere:
+#   cmake -DMIPS_TOOLCHAIN_DIR=C:/mips-toolchain ...
+# N64RECOMP_EXE defaults to the Windows multi-config path. On Linux Ninja the
+# N64RecompCLI output is ${CMAKE_BINARY_DIR}/N64Recomp; pass -DN64RECOMP_EXE.
+set(MIPS_TOOLCHAIN_DIR "E:/mips-toolchain" CACHE PATH "Root of mips64-elf toolchain (decompals/n64-tools).")
+set(MIPS_GCC           "${MIPS_TOOLCHAIN_DIR}/bin/mips64-elf-gcc.exe")
+set(MIPS_LD            "${MIPS_TOOLCHAIN_DIR}/bin/mips64-elf-ld.exe")
+set(N64RECOMP_EXE      "${CMAKE_BINARY_DIR}/Debug/N64Recomp.exe" CACHE FILEPATH "N64Recomp executable (built from lib/N64ModernRuntime/N64Recomp via N64RecompCLI target)")
+find_program(PATCHES_MAKE_EXE NAMES mingw32-make make)
+
+if (ROGUESQ_BUILD_GAME)
 
 add_library(RecompiledFuncs STATIC)
 
@@ -132,14 +148,6 @@ target_sources(RecompiledFuncs PRIVATE ${RECOMP_C_SOURCES} ${RECOMP_CXX_SOURCES}
 
 set(PATCHES_DIR             "${CMAKE_SOURCE_DIR}/patches")
 set(RECOMPILED_PATCHES_DIR  "${CMAKE_SOURCE_DIR}/RecompiledPatches")
-
-# Toolchain locations. Override on the cmake command line if installed elsewhere:
-#   cmake -DMIPS_TOOLCHAIN_DIR=C:/mips-toolchain ...
-set(MIPS_TOOLCHAIN_DIR "E:/mips-toolchain" CACHE PATH "Root of mips64-elf toolchain (decompals/n64-tools).")
-set(MIPS_GCC           "${MIPS_TOOLCHAIN_DIR}/bin/mips64-elf-gcc.exe")
-set(MIPS_LD            "${MIPS_TOOLCHAIN_DIR}/bin/mips64-elf-ld.exe")
-set(N64RECOMP_EXE      "${CMAKE_BINARY_DIR}/Debug/N64Recomp.exe" CACHE FILEPATH "N64Recomp executable (built from lib/N64ModernRuntime/N64Recomp via N64RecompCLI target)")
-find_program(PATCHES_MAKE_EXE NAMES mingw32-make make)
 
 if (EXISTS "${MIPS_GCC}" AND EXISTS "${N64RECOMP_EXE}" AND PATCHES_MAKE_EXE)
     file(GLOB PATCH_C_SOURCES "${PATCHES_DIR}/*.c")
@@ -218,6 +226,7 @@ else()
     endif()
     message(STATUS "  See patches/README.md for setup; rebuild without patches for now.")
 endif()
+endif() # ROGUESQ_BUILD_GAME
 
 # ---- Regenerate RecompiledFuncs (opt-in) ----
 # Runs N64Recomp on the in-repo rogue_squadron.toml, regenerating RecompiledFuncs/
@@ -236,6 +245,23 @@ if (TARGET N64RecompCLI)
     add_dependencies(regen_funcs N64RecompCLI)
 endif()
 
+# state_table.inl is generated from state_model.toml. The game, nav_target_test,
+# and the no-ROM host objects all include it. Not ROM-derived.
+find_package(Python3 COMPONENTS Interpreter)
+set(STATE_TABLE_INL ${CMAKE_SOURCE_DIR}/src/main/state_table.inl)
+if (Python3_Interpreter_FOUND)
+    add_custom_command(
+        OUTPUT ${STATE_TABLE_INL}
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/state/gen_state_table.py
+                ${CMAKE_SOURCE_DIR}/state_model.toml ${STATE_TABLE_INL}
+        DEPENDS ${CMAKE_SOURCE_DIR}/state_model.toml
+                ${CMAKE_SOURCE_DIR}/tools/state/gen_state_table.py
+                ${CMAKE_SOURCE_DIR}/tools/state/state_model.py
+        COMMENT "Generating state_table.inl from state_model.toml")
+    add_custom_target(gen_state_table DEPENDS ${STATE_TABLE_INL})
+endif()
+
+if (ROGUESQ_BUILD_GAME)
 # ---- Main executable ----
 # Hybrid graphics pipeline (2026-05-09):
 #   - HLE side: RT64's Factor 5 GBI module (lib/rt64/src/gbi/rt64_gbi_f3dfactor5.cpp)
@@ -256,7 +282,6 @@ set(MUSYX_AUDIO_C   ${CMAKE_SOURCE_DIR}/build/factor5_ucode/musyx_audio_recompil
 # never-taken branch near end-of-IMEM (perspective-divide reciprocal block).
 # tools/fixup_factor5_ucode.py rewrites those gotos to clean exits. The
 # fixup runs as part of CMake config so it survives any future regen.
-find_package(Python3 COMPONENTS Interpreter)
 if (Python3_Interpreter_FOUND AND EXISTS ${FACTOR5_UCODE_C})
     execute_process(
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/fixup_factor5_ucode.py ${FACTOR5_UCODE_C}
@@ -291,20 +316,6 @@ endif()
 set_source_files_properties(${FACTOR5_UCODE_C} ${FACTOR5_BOOT_C} ${MUSYX_AUDIO_C} PROPERTIES
     LANGUAGE CXX
     COMPILE_OPTIONS "-msse4.1;${RSP_UCODE_FORCE_INCLUDE}")
-
-# Generate the game-state table header from the canonical descriptor (state_model.toml).
-set(STATE_TABLE_INL ${CMAKE_SOURCE_DIR}/src/main/state_table.inl)
-if (Python3_Interpreter_FOUND)
-    add_custom_command(
-        OUTPUT ${STATE_TABLE_INL}
-        COMMAND ${Python3_EXECUTABLE} ${CMAKE_SOURCE_DIR}/tools/state/gen_state_table.py
-                ${CMAKE_SOURCE_DIR}/state_model.toml ${STATE_TABLE_INL}
-        DEPENDS ${CMAKE_SOURCE_DIR}/state_model.toml
-                ${CMAKE_SOURCE_DIR}/tools/state/gen_state_table.py
-                ${CMAKE_SOURCE_DIR}/tools/state/state_model.py
-        COMMENT "Generating state_table.inl from state_model.toml")
-    add_custom_target(gen_state_table DEPENDS ${STATE_TABLE_INL})
-endif()
 
 add_executable(RogueSquadron64Recomp
     ${CMAKE_SOURCE_DIR}/src/main/main.cpp
@@ -345,6 +356,13 @@ if (NOT MSVC)
         -fms-extensions
     )
 endif()
+# RT64_SDL_WINDOW_VULKAN is a cmake option consumed inside lib/rt64. The
+# directory-scoped compile definition does not reach this target, so Linux
+# would see plume's X11 RenderWindow instead of SDL_Window*.
+if (CMAKE_SYSTEM_NAME MATCHES "Linux" AND RT64_SDL_WINDOW_VULKAN)
+    target_compile_definitions(RogueSquadron64Recomp PRIVATE
+        PLUME_SDL_VULKAN_ENABLED RT64_SDL_WINDOW_VULKAN)
+endif()
 
 if (MSVC)
     target_link_options(RogueSquadron64Recomp PRIVATE /OPT:NOICF)
@@ -365,6 +383,7 @@ else()
     # override wins; without this ld treats the duplicate as fatal.
     target_link_options(RogueSquadron64Recomp PRIVATE -Wl,--allow-multiple-definition)
 endif()
+endif() # ROGUESQ_BUILD_GAME (executable created; SDL and final link follow the tests)
 
 # Standalone unit test for the friendly video-config translation layer.
 # Not part of the default build: cmake --build build --config Debug --target video_config_test
@@ -392,6 +411,7 @@ if (TARGET gen_state_table)
     add_dependencies(nav_target_test gen_state_table)
 endif()
 
+if (ROGUESQ_BUILD_GAME)
 # ---- SDL2 (Windows: fetch; Linux/Mac: find_package) ----
 if (WIN32)
     include(FetchContent)
@@ -484,4 +504,50 @@ if (WIN32)
             "${RS64_DIST_DIR}/mods"
         COMMENT "Assembling clean Release folder in ${RS64_DIST_DIR} (Release only)"
         VERBATIM)
+endif()
+else()
+    message(STATUS "ROGUESQ_BUILD_GAME=OFF: regen_funcs is not run and the game is not linked (ROM + rogue_squadron64 ELF)")
+    find_package(SDL2 REQUIRED)
+    # Host sources that do not include generated RecompiledFuncs output.
+    # register_overlays.cpp pulls recomp_overlays.inl and is left out.
+    add_library(rs64_host OBJECT
+        ${CMAKE_SOURCE_DIR}/src/main/main.cpp
+        ${CMAKE_SOURCE_DIR}/src/main/game_state.cpp
+        ${CMAKE_SOURCE_DIR}/src/main/nav_sequencer.cpp
+        ${CMAKE_SOURCE_DIR}/src/main/input_bindings.cpp
+        ${CMAKE_SOURCE_DIR}/src/main/video_config.cpp
+        ${CMAKE_SOURCE_DIR}/src/main/menu_config.cpp
+        ${CMAKE_SOURCE_DIR}/src/main/rt64_render_context.cpp
+        ${CMAKE_SOURCE_DIR}/src/main/upstream_compat.cpp
+        ${CMAKE_SOURCE_DIR}/src/main/hook_helpers.cpp
+        ${CMAKE_SOURCE_DIR}/src/rsp/aspMain.cpp
+        ${CMAKE_SOURCE_DIR}/src/rsp/dpc_bridge.cpp
+    )
+    if (TARGET gen_state_table)
+        add_dependencies(rs64_host gen_state_table)
+    endif()
+    target_include_directories(rs64_host PRIVATE
+        ${CMAKE_SOURCE_DIR}/include
+        ${CMAKE_SOURCE_DIR}/src/main
+        ${CMAKE_SOURCE_DIR}/lib/N64ModernRuntime/N64Recomp/include
+        ${CMAKE_SOURCE_DIR}/lib/N64ModernRuntime/ultramodern/include
+        ${CMAKE_SOURCE_DIR}/lib/N64ModernRuntime/librecomp/include
+        ${CMAKE_SOURCE_DIR}/lib/rt64/src
+        ${CMAKE_SOURCE_DIR}/lib/rt64/src/contrib
+        ${CMAKE_SOURCE_DIR}/lib/rt64/src/contrib/plume
+        ${CMAKE_SOURCE_DIR}/lib/rt64/src/contrib/imgui
+        ${CMAKE_SOURCE_DIR}/lib/rt64/src/contrib/hlslpp/include
+        ${CMAKE_SOURCE_DIR}/lib/rt64/src/contrib/mupen64plus-core/src/api
+        ${SDL2_INCLUDE_DIRS}
+    )
+    if (NOT MSVC)
+        target_compile_options(rs64_host PRIVATE -fno-strict-aliasing -fms-extensions)
+    endif()
+    target_compile_definitions(rs64_host PRIVATE HLSL_CPU)
+    if (CMAKE_SYSTEM_NAME MATCHES "Linux" AND RT64_SDL_WINDOW_VULKAN)
+        target_compile_definitions(rs64_host PRIVATE
+            PLUME_SDL_VULKAN_ENABLED RT64_SDL_WINDOW_VULKAN)
+    endif()
+    # Usage requirements only: the objects are not linked into an executable.
+    target_link_libraries(rs64_host PUBLIC librecomp ultramodern)
 endif()

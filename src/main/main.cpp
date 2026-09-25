@@ -50,6 +50,17 @@ using recomp::dbg::env_int;
 // SDL_syswm.h is only needed for the Win32 HWND path in create_window(); on
 // Linux it pulls X11 <Xlib.h>, whose None/Bool/Status macros collide with C++
 // enum members (e.g. ultramodern::input::Pak::None), so it is not included here.
+// plume_render_interface_types.h still includes X11 on Linux. Drop the macros
+// before this file's own enums (CliFlag::Bool).
+#ifdef Bool
+#undef Bool
+#endif
+#ifdef None
+#undef None
+#endif
+#ifdef Status
+#undef Status
+#endif
 static inline uint64_t GetTickCount64() {
     return (uint64_t)std::chrono::duration_cast<std::chrono::milliseconds>(
         std::chrono::steady_clock::now().time_since_epoch()).count();
