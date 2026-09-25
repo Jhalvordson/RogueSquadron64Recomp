@@ -20,7 +20,11 @@ Each pull request does one thing. Do not bundle a docs change, a guard, a workfl
 
 ### Upstream sync
 
-Add a remote named `upstream` pointing at https://github.com/MikeSemicolonD/RogueSquadron64Recomp and prefer changes that fork can take. The submodules are already the MikeSemicolonD forks of N64ModernRuntime and rt64; keep them pinned. [CONTRIBUTING.md](CONTRIBUTING.md) says the stock N64Recomp, N64ModernRuntime, and rt64 repos reject contributions from this project. Propose those changes to the MikeSemicolonD forks, not to the stock repos.
+Add a remote named `upstream` pointing at https://github.com/MikeSemicolonD/RogueSquadron64Recomp and prefer changes that fork can take. The submodules stay pinned to MikeSemicolonD's forks of N64ModernRuntime and rt64.
+
+[CONTRIBUTING.md](CONTRIBUTING.md) says the stock repos [N64Recomp](https://github.com/N64Recomp/N64Recomp), [N64ModernRuntime](https://github.com/N64Recomp/N64ModernRuntime), and [rt64](https://github.com/rt64/rt64) reject contributions from this project because it was made with AI. Agents must never open pull requests or issues against those three projects.
+
+An upstreamable fix goes only to MikeSemicolonD's own repos (RogueSquadron64Recomp and his submodule forks), and only when Jeff decides to send it.
 
 ### Who merges
 

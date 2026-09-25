@@ -148,6 +148,9 @@ README section `Status (PLAYABLE)` lists these as open, from the upstream author
 - It links `README.md#open-work`. The README has no Open work heading. The status list is `## Status (PLAYABLE)`.
 - Open work item 4 says the keyboard rebind UI is still to port. `src/main/main.cpp` already has an F6 Controls window and `roguesq_input.json` (see below).
 - Open work item 3 says plain KSEG0 entry-bail / skip-store hooks remain in the toml. `rogue_squadron.toml` around the host-hooks banner says those inline KSEG0 guards are gone.
+- The README controls table lists look-around as F8. `src/main/input_bindings.cpp` `default_bindings` binds `Target::CUp` to `SDL_SCANCODE_Q`, and the comment on that line calls it look around. No default binding uses F8.
+- That same table assigns cockpit, close, and switch view to F1, F3, and F4, and `default_bindings` binds those actions to those keys. The next README paragraphs say Debug builds also use F1 for the RT64 inspector, F3 for ViewRDRAM, and F4 for texture replacement.
+- `CMakeLists.txt` defaults `MIPS_TOOLCHAIN_DIR` to `E:/mips-toolchain` and points `MIPS_GCC` / `MIPS_LD` at the `.exe` names under `bin/`. The README build section says Debug is the tested configuration.
 
 `src/main/rt64_render_context.cpp` sets `refreshRate = RefreshRate::Original` (interpolation off) and `refreshRateTarget = 60`, then the `ROGUESQ_RT_INTERP` block's comment says the baseline is on at 60 Hz. `docs/debug-trace-env-vars.md` says the env var defaults off. The README says turning interpolation on glitches. The same env-var doc says the Factor 5 path was "nearly flicker-free". Those two documents disagree. This audit did not run either setting.
 
