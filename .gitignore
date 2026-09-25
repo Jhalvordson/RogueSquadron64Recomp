@@ -19,10 +19,15 @@
 crash_*.dmp
 *.dmp
 
-# ROMs and ELF inputs
+# ROMs and ELF inputs. rom/ is the local dump directory; only the README
+# and the SHA-1 placeholder are tracked.
 *.elf
 *.z64
 *.n64
+*.v64
+/rom/*
+!/rom/README.md
+!/rom/expected-sha1.txt
 
 # Recompiler outputs
 RecompiledFuncs/

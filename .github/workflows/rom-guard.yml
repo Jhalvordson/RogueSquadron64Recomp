@@ -1,0 +1,25 @@
+# Fails the job if a ROM image or an 8 MiB-or-larger blob is in the tree.
+# Does not build the game and does not upload anything.
+
+name: rom-guard
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  guard:
+    name: No ROM blobs
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install xxhash
+        run: sudo apt-get update && sudo apt-get install -y python3-xxhash
+
+      - name: Hash helper self-test
+        run: python3 tools/verify_rom.py --self-test
+
+      - name: Reject ROM images and large blobs
+        run: python3 tools/check_no_rom_blobs.py

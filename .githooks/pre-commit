@@ -1,0 +1,3 @@
+#!/bin/sh
+# Optional. Enable with: git config core.hooksPath .githooks
+exec python3 tools/check_no_rom_blobs.py --staged
