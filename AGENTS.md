@@ -2,6 +2,42 @@
 
 Guidance for AI agents working on the Rogue Squadron 64 Recompiled project — a native port of *Star Wars: Rogue Squadron* (N64, USA v1.0) built with N64Recomp + RT64. The game boots, and content renders: attribution text, the textured Factor 5 / N64-logo cinematic, the main menu, and the attract demo all come up. The current frontier is display-list fidelity (texturing/UV bugs and per-frame DL desyncs), attract-demo stability, and symbol renaming. See the [Status](README.md#status) table in the README for the authoritative what-works snapshot before starting anything — this file assumes it.
 
+## Fork charter
+
+This section is the policy for the Jhalvordson fork. The rest of this file is the upstream technical guide. Where they disagree, this charter wins. A source snapshot of the build, the ROM check, and the display/input hooks is in [docs/AUDIT.md](docs/AUDIT.md).
+
+### Scope
+
+Phase 1 is the only active work: CI and release packaging, widescreen, 60fps / frame pacing, controls, and the known bugs. Phase 2, a Battle for Naboo recomp, is parked. Do not start it. The tracking issue is https://github.com/Jhalvordson/RogueSquadron64Recomp/issues/13.
+
+### No ROM, no derived assets
+
+Never commit or publish a ROM or a ROM-derived asset. That includes `.z64` / `.n64` / `.v64`, `RecompiledFuncs/`, extracted textures, and extracted audio. The user supplies their own dump locally. A hash check for that dump is described in [docs/AUDIT.md](docs/AUDIT.md).
+
+### One concern per PR
+
+Each pull request does one thing. Do not bundle a docs change, a guard, a workflow, and a tool into the same PR.
+
+### Upstream sync
+
+Add a remote named `upstream` pointing at https://github.com/MikeSemicolonD/RogueSquadron64Recomp and prefer changes that fork can take. The submodules stay pinned to MikeSemicolonD's forks of N64ModernRuntime and rt64.
+
+[CONTRIBUTING.md](CONTRIBUTING.md) says the stock repos [N64Recomp](https://github.com/N64Recomp/N64Recomp), [N64ModernRuntime](https://github.com/N64Recomp/N64ModernRuntime), and [rt64](https://github.com/rt64/rt64) reject contributions from this project because it was made with AI. Agents must never open pull requests or issues against those three projects.
+
+An upstreamable fix goes only to MikeSemicolonD's own repos (RogueSquadron64Recomp and his submodule forks), and only when Jeff decides to send it.
+
+### Who merges
+
+Agents open draft pull requests. Jeff merges. An agent does not merge, and does not use keywords that would close an issue on merge.
+
+### builds-not-verified-in-game
+
+Label every pull request `builds-not-verified-in-game`. This fork has not been run against a ROM (no dump until about 12 Oct 2026). Do not claim in-game verification. A green compile is not a playtest.
+
+### Local Qwen lane
+
+A local OpenAI-compatible endpoint is for bulk proposals only: function naming, crash and log triage, doc drafts, and test-output review. The endpoint and model come from environment variables, never from a host or model baked into the repo. The scaffold, when present, is `tools/qwen/`. Example only, for a homelab Ollama server: `QWEN_BASE_URL=http://homelab70:11434/v1` and `QWEN_MODEL=qwen3.8:27b`. The lane writes proposals. It does not merge, and it does not commit ROM bytes or extracted assets.
+
 ## Project layout
 
 ```
