@@ -1,0 +1,4 @@
+# Not the startup check. The game compares XXH3-64 (see tools/verify_rom.py).
+# Replace the PLACEHOLDER line with the lowercase SHA-1 of the normalized
+# big-endian USA v1.0 image once you have hashed your own dump.
+PLACEHOLDER
